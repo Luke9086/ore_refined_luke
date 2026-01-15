@@ -85,7 +85,17 @@ async fn get_balance(
     rpc: &Arc<RpcClient>,
     payer: &Arc<Keypair>,
 ) -> anyhow::Result<()> {
-    let mut miner = get_miner(&rpc, payer.pubkey()).await?;
+    // Try to get miner account, handle case where it doesn't exist
+    let miner_result = get_miner(&rpc, payer.pubkey()).await;
+    let mut miner = match miner_result {
+        Ok(m) => m,
+        Err(e) => {
+            let miner_pda = ore_api::state::miner_pda(payer.pubkey());
+            info!("Miner account not found at {}. You need to register first using the ORE CLI: `ore register`", miner_pda.0);
+            info!("Error details: {}", e);
+            return Err(anyhow::anyhow!("Miner account not registered. Please run `ore register` first to create your miner account."));
+        }
+    };
 
     let treasury = get_treasury(&rpc).await?;
     if treasury.miner_rewards_factor > miner.rewards_factor {
@@ -102,8 +112,14 @@ async fn get_balance(
 
 
     let ore_ata_address = get_associated_token_address(&payer.pubkey(), &pubkey!("oreoU2P8bN6jkk3jbaiVxYnG1dCXcYxwhwyK9jSybcp"));
-    let ore_amount = rpc.get_token_account_balance(&ore_ata_address).await?;
-    let wallet_ore = ore_amount.amount.parse::<u64>().unwrap_or(0);
+    // Handle case where ORE token account doesn't exist
+    let wallet_ore = match rpc.get_token_account_balance(&ore_ata_address).await {
+        Ok(ore_amount) => ore_amount.amount.parse::<u64>().unwrap_or(0),
+        Err(_) => {
+            info!("ORE token account not found. Wallet ORE balance: 0");
+            0
+        }
+    };
 
 
 
@@ -172,7 +188,8 @@ async fn on_chain_main(
 
         let checkpoint_ix = checkpoint(payer.pubkey(), payer.pubkey(), miner.round_id);
         let refined_ix = get_ore_refined_ix(
-            payer.pubkey(),
+            &args.rpc,
+            payer.clone(),
             round_id,
             ore_price,
             sol_price,
@@ -221,11 +238,14 @@ async fn update_board_loop(
 ) -> anyhow::Result<()> {
     tokio::spawn(async move {
         loop {
-            let new_board = get_board(&rpc_client).await.unwrap();
-
-            {
-                let mut board_guard = board.lock().await;
-                *board_guard = new_board;
+            match get_board(&rpc_client).await {
+                Ok(new_board) => {
+                    let mut board_guard = board.lock().await;
+                    *board_guard = new_board;
+                }
+                Err(e) => {
+                    info!("Failed to update board: {}", e);
+                }
             }
 
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -241,11 +261,14 @@ async fn update_miner_loop(
 ) -> anyhow::Result<()> {
     tokio::spawn(async move {
         loop {
-            let new_miner = get_miner(&rpc, payer.pubkey()).await.unwrap();
-
-            {
-                let mut miner_guard = miner.lock().await;
-                *miner_guard = new_miner;
+            match get_miner(&rpc, payer.pubkey()).await {
+                Ok(new_miner) => {
+                    let mut miner_guard = miner.lock().await;
+                    *miner_guard = new_miner;
+                }
+                Err(e) => {
+                    info!("Failed to update miner: {}", e);
+                }
             }
 
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -257,11 +280,14 @@ async fn update_miner_loop(
 async fn update_clock_loop(rpc: Arc<RpcClient>, clock: Arc<Mutex<Clock>>) -> anyhow::Result<()> {
     tokio::spawn(async move {
         loop {
-            let new_clock = get_clock(&rpc).await.unwrap();
-
-            {
-                let mut clock_guard = clock.lock().await;
-                *clock_guard = new_clock;
+            match get_clock(&rpc).await {
+                Ok(new_clock) => {
+                    let mut clock_guard = clock.lock().await;
+                    *clock_guard = new_clock;
+                }
+                Err(e) => {
+                    info!("Failed to update clock: {}", e);
+                }
             }
 
             tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -281,13 +307,15 @@ async fn update_round_loop(
             let round_id = {
                 board.lock().await.round_id
             };
-            // 获取新的clock
-            let new_round = get_round(&rpc,round_id).await.unwrap();
-
-            // 获取锁并更新数据
-            {
-                let mut clock_guard = round.lock().await;
-                *clock_guard = new_round;
+            // 获取新的round
+            match get_round(&rpc, round_id).await {
+                Ok(new_round) => {
+                    let mut round_guard = round.lock().await;
+                    *round_guard = new_round;
+                }
+                Err(e) => {
+                    info!("Failed to update round: {}", e);
+                }
             }
 
             // 添加延时避免过于频繁的请求
