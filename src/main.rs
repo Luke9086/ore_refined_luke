@@ -48,6 +48,9 @@ declare_program!(ore_por_program);
 pub const DEFALUT_UNITS: u64 = 400_000;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load .env file if it exists
+    dotenvy::dotenv().ok();
+    
     tracing_subscriber::fmt::init();
     let args = Args::parse();
     info!("Args: {:?}", args);
@@ -304,6 +307,7 @@ struct Args {
         long,
         value_name = "RPC_URL",
         help = "RPC address of your RPC provider,The recommended one is Helius",
+        env = "RPC_URL"
     )]
     rpc: String,
 
@@ -311,6 +315,7 @@ struct Args {
         long,
         value_name = "KEYPAIR_PATH",
         help = "Path to your Solana keypair file",
+        env = "KEYPAIR_PATH"
     )]
     keypair: String,
 
@@ -318,6 +323,7 @@ struct Args {
         long,
         value_name = "PER_ROUND_DEPLOY_AMOUNT",
         help = "The amount of SOL you expect to deploy in each round",
+        env = "PER_ROUND_DEPLOY_AMOUNT"
     )]
     per_round_deploy_amount: f64,
 
@@ -326,7 +332,8 @@ struct Args {
         long,
         value_name = "REMAINING_SLOTS",
         help = "The required slot for the transaction to land, specified by the number of slots remaining in the round.",
-        default_value = "15"
+        default_value = "15",
+        env = "REMAINING_SLOTS"
     )]
     remaining_slots: u8,
 
@@ -335,7 +342,8 @@ struct Args {
         long,
         value_name = "ORE_REFINED_RATE",
         help = "The refined rate of ORE you expect to get when deploying SOL. e.g. 1.3 means 1.3 ORE can be refined to 1 unclaimed ORE. The minimum is 1.1.",
-        default_value = "1.3"
+        default_value = "1.3",
+        env = "ORE_REFINED_RATE"
     )]
     ore_refined_rate: f64
 

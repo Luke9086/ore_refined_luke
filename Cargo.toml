@@ -37,8 +37,9 @@ futures-util = "0.3.31"
 serde = { version = "1.0.219", features = ["derive"] }
 eyre = "0.6.12"
 tokio-tungstenite = "0.20.1"
-clap = { version = "4.5.48", features = ["derive"] }
+clap = { version = "4.5.48", features = ["derive", "env"] }
 solana-transaction-status = "3.0.3"
+dotenvy = "0.15"
 
 
 [patch.crates-io]

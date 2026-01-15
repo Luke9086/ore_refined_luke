@@ -1,0 +1,10 @@
+target/
+.env
+.DS_Store
+.idea/
+.vscode/
+.cursor/
+.cursorrules
+.cursorignore
+.cursorignorerules
+.cursorignorerules
