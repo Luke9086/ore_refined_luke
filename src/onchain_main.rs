@@ -25,8 +25,7 @@ declare_program!(ore_por_program);
 use ore_por_program::{ client::accounts, client::args};
 
 pub fn get_ore_refined_ix(
-    rpc_url: &str,
-    payer: Arc<Keypair>,
+    signer: Pubkey,
     round_id: u64,
     ore_price: f64,
     sol_price: f64,
@@ -38,9 +37,17 @@ pub fn get_ore_refined_ix(
 
     info!("deploy_amount: {:?}",deploy_amount);
 
-    let signer = payer.pubkey();
+
+    let url = Cluster::Custom(
+        "http://localhost:8899".to_string(),
+        "ws://127.0.0.1:8900".to_string(),
+    );
+
+    let payer = Arc::new(Keypair::new());
+    let program_client = Client::new(url.clone(), payer.clone());
+    // Create program client
     let provider = Client::new_with_options(
-        Cluster::Custom(rpc_url.to_string(), rpc_url.replace("https://", "wss://").replace("http://", "ws://")),
+        Cluster::Localnet,
         Rc::new(payer),
         CommitmentConfig::confirmed(),
     );

@@ -178,9 +178,10 @@ async fn on_chain_main(
 
 
 
-        let slot_left = board.end_slot.saturating_sub(clock.slot);
+        let current_slot = rpc.get_slot().await.unwrap_or(clock.slot);
+        let slot_left = board.end_slot.saturating_sub(current_slot);
 
-        info!("round_id: {:?} slot_left: {:?}", round_id, slot_left);
+        info!("round_id: {:?} slot_left: {:?} current_slot: {:?}", round_id, slot_left, current_slot);
 
         if slot_left > args.remaining_slots as u64 {
             continue;
@@ -188,8 +189,7 @@ async fn on_chain_main(
 
         let checkpoint_ix = checkpoint(payer.pubkey(), payer.pubkey(), miner.round_id);
         let refined_ix = get_ore_refined_ix(
-            &args.rpc,
-            payer.clone(),
+            payer.pubkey(),
             round_id,
             ore_price,
             sol_price,
