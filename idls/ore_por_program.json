@@ -1,14 +1,30 @@
 {
-  "address": "HZJfY7oVkbWxsmMQX5ipqahMnC74H72UYaBXJ8an2PoR",
+  "address": "4c5XjaLf8T5QciGtQSACTyPsU3E34JWeAwUfNqptddnd",
   "metadata": {
     "name": "ore_por_program",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Created with Anchor"
+    "description": "ORE Proof-of-Refinement on-chain program — intelligently deploys SOL across all 25 ORE grid squares at end-of-round for maximum coverage."
   },
   "instructions": [
     {
       "name": "refined",
+      "docs": [
+        "**Refined** — leveling SOL deployment across ORE squares.",
+        "",
+        "Strategy:",
+        "1. Read `Round.deployed[25]` and compute the average deployed amount.",
+        "2. Validate EV against the least-deployed (best) square.",
+        "3. Sort squares ascending by deployed amount.",
+        "For each square (least → most), deploy the difference between",
+        "that square's balance and the average. This levels the board from",
+        "the bottom up, maximising ownership share on under-deployed squares.",
+        "Stop as soon as `amount` is exhausted.",
+        "4. Collect a 0.5% protocol fee on the amount actually deployed.",
+        "",
+        "Should be called when `slots_remaining <= remaining_slots` (last few slots",
+        "of the round) so the deployment cannot be front-run by late joiners."
+      ],
       "discriminator": [
         63,
         24,
@@ -22,42 +38,91 @@
       "accounts": [
         {
           "name": "signer",
+          "docs": [
+            "The user who signs the transaction and pays for the deployment."
+          ],
           "writable": true,
           "signer": true
         },
         {
           "name": "authority",
+          "docs": [
+            "Authority = owner of the miner / automation accounts.",
+            "Usually the same as `signer`."
+          ],
           "writable": true
         },
         {
           "name": "automation",
+          "docs": [
+            "Automation PDA = automation_pda(authority).",
+            "May be uninitialized/empty — if so, ore uses the direct (non-automation) path",
+            "and draws SOL directly from `signer`."
+          ],
           "writable": true
         },
         {
           "name": "board",
+          "docs": [
+            "Board PDA = board_pda().",
+            "Holds current round_id, start_slot, end_slot."
+          ],
           "writable": true
         },
         {
+          "name": "config",
+          "docs": [
+            "Config PDA = config_pda().",
+            "Required as account #4 in the ore deploy instruction but currently",
+            "unused by that handler (field prefixed with `_`)."
+          ]
+        },
+        {
           "name": "miner",
+          "docs": [
+            "Miner PDA = miner_pda(authority).",
+            "Tracks per-square deployment history and unclaimed rewards."
+          ],
           "writable": true
         },
         {
           "name": "round",
+          "docs": [
+            "Round PDA = round_pda(current_round_id).",
+            "We read `deployed[25]` from this account for EV calculations."
+          ],
           "writable": true
         },
         {
           "name": "treasury",
-          "writable": true
+          "docs": [
+            "Treasury PDA = treasury_pda().",
+            "Included for consistency with the checkpoint / claim_sol instructions",
+            "that share the same transaction; not accessed in this instruction."
+          ]
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "docs": [
+            "System program — needed for SOL transfers (deploy + fee)."
+          ],
+          "address": "11111111111111111111111111111111"
         },
         {
-          "name": "ore_program"
+          "name": "ore_program",
+          "docs": [
+            "ORE program — the target of the deploy CPI."
+          ],
+          "address": "oreV3EG1i9BEgiAJ8b177Z2S2rMarzak4NMv1kULvWv"
         },
         {
           "name": "fee",
-          "writable": true
+          "docs": [
+            "Fee collector wallet.",
+            "Receives the 0.5% protocol fee on every successful deployment."
+          ],
+          "writable": true,
+          "address": "7cgWfSmeAkr7WhRgg6UEjWmYQpV644q5M2d6E1Rmbr18"
         }
       ],
       "args": [
@@ -82,7 +147,7 @@
           "type": "f64"
         },
         {
-          "name": "req_id",
+          "name": "_req_id",
           "type": "u8"
         }
       ]
@@ -91,18 +156,28 @@
   "errors": [
     {
       "code": 6000,
-      "name": "InvalidSlot",
-      "msg": "The current slot does not meet the requirements."
+      "name": "InvalidRoundAccount",
+      "msg": "Round account data is too short or malformed"
     },
     {
       "code": 6001,
-      "name": "AlreadyDeploy",
-      "msg": "Deployment has already been completed and cannot be repeated."
+      "name": "AmountTooSmall",
+      "msg": "Deploy amount is too small or all squares are at/above average"
     },
     {
       "code": 6002,
-      "name": "NoSquareDeploy",
-      "msg": "No qualifying square to deploy."
+      "name": "InvalidPriceData",
+      "msg": "ore_price and sol_price must both be > 0"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidRefinedRate",
+      "msg": "ore_refined_rate must be >= 1.0"
+    },
+    {
+      "code": 6004,
+      "name": "EVBelowThreshold",
+      "msg": "Expected value per SOL is below the ore_refined_rate threshold — skipping deployment"
     }
   ]
 }

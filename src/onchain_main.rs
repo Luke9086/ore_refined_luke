@@ -18,7 +18,7 @@ use anchor_client::{
 use anchor_lang::prelude::*;
 use log::info;
 use ore_api::prelude::{automation_pda, board_pda, miner_pda, treasury_pda};
-use ore_api::state::round_pda;
+use ore_api::state::{config_pda, round_pda};
 use spl_associated_token_account::get_associated_token_address;
 
 declare_program!(ore_por_program);
@@ -58,12 +58,13 @@ pub fn get_ore_refined_ix(
         authority: signer,
         automation: automation_pda(signer).0,
         board: board_pda().0,
+        config: config_pda().0,
         miner: miner_pda(signer).0,
         round: round_pda(round_id).0,
         treasury: treasury_pda().0,
         system_program: system_program::ID,
         ore_program: pubkey!("oreV3EG1i9BEgiAJ8b177Z2S2rMarzak4NMv1kULvWv"),
-        fee: pubkey!("Feei2iwqp9Adcyte1F5XnKzGTFL1VDg4VyiypvoeiJyJ")
+        fee: pubkey!("7cgWfSmeAkr7WhRgg6UEjWmYQpV644q5M2d6E1Rmbr18")
     };
 
 
@@ -78,7 +79,7 @@ pub fn get_ore_refined_ix(
             amount: deploy_amount,
             remaining_slots,
             ore_refined_rate,
-            req_id
+            _req_id: req_id
         })
         .instructions()?.remove(0);
 
