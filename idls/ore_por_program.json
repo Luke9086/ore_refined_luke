@@ -1,5 +1,5 @@
 {
-  "address": "4c5XjaLf8T5QciGtQSACTyPsU3E34JWeAwUfNqptddnd",
+  "address": "3c9kYjVCA8MgbbezDDNzTtrrebwWrK6ytVDRFGMhUrkL",
   "metadata": {
     "name": "ore_por_program",
     "version": "0.1.0",
@@ -114,6 +114,21 @@
             "ORE program — the target of the deploy CPI."
           ],
           "address": "oreV3EG1i9BEgiAJ8b177Z2S2rMarzak4NMv1kULvWv"
+        },
+        {
+          "name": "entropy_var",
+          "docs": [
+            "Entropy var PDA = var_pda(board, 0).",
+            "Required by the ORE deploy CPI for randomness sampling."
+          ],
+          "writable": true
+        },
+        {
+          "name": "entropy_program",
+          "docs": [
+            "Entropy program — invoked by ORE deploy to sample randomness."
+          ],
+          "address": "3jSkUuYBoJzQPMEzTvkDFXCZUBksPamrVhrnHR9igu2X"
         },
         {
           "name": "fee",

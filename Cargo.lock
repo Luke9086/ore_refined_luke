@@ -1406,9 +1406,9 @@ checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
 name = "entropy-api"
-version = "0.1.4"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfdd094bc029452f4cd7627872362dea607ee9569cc09c84b53810f62449b126"
+checksum = "4574bb002d8caf354867652027d08932dd243fdff1b451fc528439791928b0b7"
 dependencies = [
  "bytemuck",
  "num_enum",
@@ -2722,6 +2722,7 @@ dependencies = [
  "bincode",
  "clap",
  "dotenvy",
+ "entropy-api",
  "eyre",
  "futures-util",
  "log",

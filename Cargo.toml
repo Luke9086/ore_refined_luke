@@ -20,6 +20,7 @@ solana-client = "^2.1"
 solana-sdk = "^2.1"
 spl-token = { version = "^4", features = ["no-entrypoint"] }
 ore-api = { git = "https://github.com/regolith-labs/ore", branch = "master" }
+entropy-api = "0.1.6"
 
 steel = { features = ["spl"], version = "4.0.2" }
 tokio = { version = "1.36", features = ["full"] }

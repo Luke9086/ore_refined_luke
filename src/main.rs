@@ -1,47 +1,47 @@
 mod history;
 mod jito;
 mod onchain_main;
-mod utils;
 mod price;
+mod utils;
 
-use clap::{command, Parser, Subcommand};
+use clap::{Parser, Subcommand, command};
 
 use crate::history::get_history_winners;
+use crate::jito::send_bundle;
 use crate::onchain_main::get_ore_refined_ix;
+use crate::price::get_price;
 use anchor_lang::declare_program;
 use anchor_lang::prelude::*;
-use ore_api::prelude::*;
+use ore_api::prelude::{automation_pda, *};
 use rand::Rng;
 use solana_account_decoder::{UiAccountEncoding, UiDataSliceConfig};
 use solana_client::rpc_filter::MemcmpEncodedBytes;
 use solana_client::{
-    client_error::{reqwest::StatusCode, ClientErrorKind},
+    client_error::{ClientErrorKind, reqwest::StatusCode},
     nonblocking::rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_filter::{Memcmp, RpcFilterType},
 };
+use solana_sdk::address_lookup_table::AddressLookupTableAccount;
+use solana_sdk::address_lookup_table::state::AddressLookupTable;
 use solana_sdk::commitment_config::CommitmentConfig;
 use solana_sdk::signature::Keypair;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
     keccak::hash,
     pubkey::Pubkey,
-    signature::{read_keypair_file, Signer},
+    signature::{Signer, read_keypair_file},
     transaction::Transaction,
 };
+use spl_associated_token_account::get_associated_token_address;
 use spl_token::amount_to_ui_amount;
 use std::str::FromStr;
 use std::sync::Arc;
-use solana_sdk::address_lookup_table::AddressLookupTableAccount;
-use solana_sdk::address_lookup_table::state::AddressLookupTable;
-use spl_associated_token_account::get_associated_token_address;
 use steel::{AccountDeserialize, Clock, Discriminator, Numeric};
 use tokio::select;
 use tokio::sync::Mutex;
 use tracing::info;
 use utils::*;
-use crate::jito::send_bundle;
-use crate::price::get_price;
 
 declare_program!(ore_por_program);
 
@@ -50,26 +50,23 @@ pub const DEFALUT_UNITS: u64 = 400_000;
 async fn main() -> anyhow::Result<()> {
     // Load .env file if it exists
     dotenvy::dotenv().ok();
-    
+
     tracing_subscriber::fmt::init();
     let args = Args::parse();
     info!("Args: {:?}", args);
-
 
     let commitment = CommitmentConfig::processed();
 
     // Build transaction
     let rpc = Arc::new(RpcClient::new_with_commitment(
-        args.rpc
-            .parse()
-            .unwrap(),
+        args.rpc.parse().unwrap(),
         commitment,
     ));
 
     let payer = Arc::new(read_keypair_file(args.keypair.clone()).unwrap());
-    get_balance(&rpc,&payer).await?;
+    get_balance(&rpc, &payer).await?;
 
-    on_chain_main(&rpc, &payer,args).await?;
+    on_chain_main(&rpc, &payer, args).await?;
 
     select! {
         _ = tokio::signal::ctrl_c() => {
@@ -80,20 +77,21 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-
-async fn get_balance(
-    rpc: &Arc<RpcClient>,
-    payer: &Arc<Keypair>,
-) -> anyhow::Result<()> {
+async fn get_balance(rpc: &Arc<RpcClient>, payer: &Arc<Keypair>) -> anyhow::Result<()> {
     // Try to get miner account, handle case where it doesn't exist
     let miner_result = get_miner(&rpc, payer.pubkey()).await;
     let mut miner = match miner_result {
         Ok(m) => m,
         Err(e) => {
             let miner_pda = ore_api::state::miner_pda(payer.pubkey());
-            info!("Miner account not found at {}. You need to register first using the ORE CLI: `ore register`", miner_pda.0);
+            info!(
+                "Miner account not found at {}. You need to register first using the ORE CLI: `ore register`",
+                miner_pda.0
+            );
             info!("Error details: {}", e);
-            return Err(anyhow::anyhow!("Miner account not registered. Please run `ore register` first to create your miner account."));
+            return Err(anyhow::anyhow!(
+                "Miner account not registered. Please run `ore register` first to create your miner account."
+            ));
         }
     };
 
@@ -107,11 +105,12 @@ async fn get_balance(
         miner.refined_ore += personal_rewards.to_u64();
     }
 
-
     let sol_balance = rpc.get_balance(&payer.pubkey()).await?;
 
-
-    let ore_ata_address = get_associated_token_address(&payer.pubkey(), &pubkey!("oreoU2P8bN6jkk3jbaiVxYnG1dCXcYxwhwyK9jSybcp"));
+    let ore_ata_address = get_associated_token_address(
+        &payer.pubkey(),
+        &pubkey!("oreoU2P8bN6jkk3jbaiVxYnG1dCXcYxwhwyK9jSybcp"),
+    );
     // Handle case where ORE token account doesn't exist
     let wallet_ore = match rpc.get_token_account_balance(&ore_ata_address).await {
         Ok(ore_amount) => ore_amount.amount.parse::<u64>().unwrap_or(0),
@@ -121,40 +120,39 @@ async fn get_balance(
         }
     };
 
-
-
-    info!("wallet: {:?} sol:{:.2} unclaimed_sol:{}\t \t wallet_ore:{:.2} \t unclaimed_ore: {:.2} \t refined_ore: {:.2}",
-                payer.pubkey(),
-                amount_to_ui_amount(sol_balance, 9),
-                amount_to_ui_amount(miner.rewards_sol, 9),
-                amount_to_ui_amount(wallet_ore, TOKEN_DECIMALS),
-                amount_to_ui_amount(miner.rewards_ore, TOKEN_DECIMALS),
-                amount_to_ui_amount(miner.refined_ore, TOKEN_DECIMALS),
+    info!(
+        "wallet: {:?} sol:{:.2} unclaimed_sol:{}\t \t wallet_ore:{:.2} \t unclaimed_ore: {:.2} \t refined_ore: {:.2}",
+        payer.pubkey(),
+        amount_to_ui_amount(sol_balance, 9),
+        amount_to_ui_amount(miner.rewards_sol, 9),
+        amount_to_ui_amount(wallet_ore, TOKEN_DECIMALS),
+        amount_to_ui_amount(miner.rewards_ore, TOKEN_DECIMALS),
+        amount_to_ui_amount(miner.refined_ore, TOKEN_DECIMALS),
     );
 
     Ok(())
 }
 
-
 async fn on_chain_main(
     rpc: &Arc<RpcClient>,
     payer: &Arc<Keypair>,
-    args: Args
+    args: Args,
 ) -> anyhow::Result<()> {
     let board_mutex = Arc::new(Mutex::new(get_board(&rpc).await?));
     let clock_mutex = Arc::new(Mutex::new(get_clock(&rpc).await?));
-    let miner_mutex = Arc::new(Mutex::new(get_miner(&rpc,payer.pubkey()).await?));
-    let round_mutex = Arc::new(Mutex::new(get_round(&rpc,board_mutex.lock().await.round_id).await?));
+    let miner_mutex = Arc::new(Mutex::new(get_miner(&rpc, payer.pubkey()).await?));
+    let round_mutex = Arc::new(Mutex::new(
+        get_round(&rpc, board_mutex.lock().await.round_id).await?,
+    ));
 
     update_board_loop(rpc.clone(), board_mutex.clone()).await?;
     update_clock_loop(rpc.clone(), clock_mutex.clone()).await?;
-    update_miner_loop(rpc.clone(), payer.clone(),miner_mutex.clone()).await?;
-    update_round_loop(rpc.clone(), round_mutex.clone(),board_mutex.clone()).await?;
-
+    update_miner_loop(rpc.clone(), payer.clone(), miner_mutex.clone()).await?;
+    update_round_loop(rpc.clone(), round_mutex.clone(), board_mutex.clone()).await?;
 
     let mut last_round_id = 0_u64;
     let mut req_id = 0;
-    let (mut ore_price,mut sol_price) = get_price().await?;
+    let (mut ore_price, mut sol_price) = get_price().await?;
 
     loop {
         req_id += 1;
@@ -166,22 +164,21 @@ async fn on_chain_main(
         let miner = miner_mutex.lock().await.clone();
         let round_id = board.round_id;
 
-
         if last_round_id != round_id {
             info!("New round detected: {}", round_id);
             last_round_id = round_id;
-            (ore_price,sol_price) = get_price().await?;
+            (ore_price, sol_price) = get_price().await?;
             info!("ORE price: {} USDC", ore_price);
             info!("SOL price: {} USDC", sol_price);
         }
 
+        // let current_slot = rpc.get_slot().await.unwrap_or(clock.slot);
+        let slot_left = board.end_slot.saturating_sub(clock.slot);
 
-
-
-        let current_slot = rpc.get_slot().await.unwrap_or(clock.slot);
-        let slot_left = board.end_slot.saturating_sub(current_slot);
-
-        info!("round_id: {:?} slot_left: {:?} current_slot: {:?}", round_id, slot_left, current_slot);
+        info!(
+            "round_id: {:?} slot_left: {:?} current_slot: {:?}",
+            round_id, slot_left, clock.slot
+        );
 
         if slot_left > args.remaining_slots as u64 {
             continue;
@@ -199,13 +196,13 @@ async fn on_chain_main(
             req_id,
         )?;
         let claim_sol_ix = claim_sol(payer.pubkey());
-        let ixs = [checkpoint_ix.clone(),refined_ix.clone(),claim_sol_ix];
+        let ixs = [checkpoint_ix.clone(), refined_ix.clone(), claim_sol_ix];
 
         if slot_left > 1 {
             let simulate_result = simulate_transaction(&rpc, &payer, &ixs).await?;
             let mut units_consumed = simulate_result.value.units_consumed.unwrap_or(0);
             units_consumed = (units_consumed * 11 / 10).max(200_000);
-            
+
             if simulate_result.value.err.is_some() {
                 info!(
                     "simulate transaction failed: {:?}",
@@ -221,12 +218,11 @@ async fn on_chain_main(
                 let rpc_clone = rpc.clone();
                 let payer_clone = payer.clone();
                 tokio::spawn(async move {
-                    let result = send_ix_use_jito(&rpc_clone, &payer_clone, &ixs,units_consumed).await;
+                    let result =
+                        send_ix_use_jito(&rpc_clone, &payer_clone, &ixs, units_consumed).await;
                 });
             }
         }
-
-        
     }
 
     Ok(())
@@ -296,7 +292,6 @@ async fn update_clock_loop(rpc: Arc<RpcClient>, clock: Arc<Mutex<Clock>>) -> any
     Ok(())
 }
 
-
 async fn update_round_loop(
     rpc: Arc<RpcClient>,
     round: Arc<Mutex<Round>>,
@@ -304,9 +299,7 @@ async fn update_round_loop(
 ) -> anyhow::Result<()> {
     tokio::spawn(async move {
         loop {
-            let round_id = {
-                board.lock().await.round_id
-            };
+            let round_id = { board.lock().await.round_id };
             // 获取新的round
             match get_round(&rpc, round_id).await {
                 Ok(new_round) => {
@@ -325,12 +318,9 @@ async fn update_round_loop(
     Ok(())
 }
 
-
-
 #[derive(Parser, Debug)]
 #[command(about, version)]
 struct Args {
-
     #[arg(
         long,
         value_name = "RPC_URL",
@@ -355,7 +345,6 @@ struct Args {
     )]
     per_round_deploy_amount: f64,
 
-
     #[arg(
         long,
         value_name = "REMAINING_SLOTS",
@@ -365,7 +354,6 @@ struct Args {
     )]
     remaining_slots: u8,
 
-
     #[arg(
         long,
         value_name = "ORE_REFINED_RATE",
@@ -373,6 +361,5 @@ struct Args {
         default_value = "1.3",
         env = "ORE_REFINED_RATE"
     )]
-    ore_refined_rate: f64
-
+    ore_refined_rate: f64,
 }
