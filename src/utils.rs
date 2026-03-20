@@ -168,6 +168,18 @@ pub async fn submit_transaction_with_ixs(
     Ok(())
 }
 
+async fn get_p75_priority_fee(rpc: &RpcClient) -> u64 {
+    match rpc.get_recent_prioritization_fees(&[]).await {
+        Ok(fees) if !fees.is_empty() => {
+            let mut values: Vec<u64> = fees.iter().map(|f| f.prioritization_fee).collect();
+            values.sort_unstable();
+            let idx = (values.len() * 3 / 4).min(values.len() - 1);
+            values[idx]
+        }
+        _ => 1000,
+    }
+}
+
 pub async fn send_ix_use_jito(
     rpc: &RpcClient,
     payer: &solana_sdk::signer::keypair::Keypair,
@@ -175,10 +187,11 @@ pub async fn send_ix_use_jito(
     units: u64,
 ) -> anyhow::Result<()> {
 
+    let priority_fee = get_p75_priority_fee(rpc).await;
     let blockhash = rpc.get_latest_blockhash().await?;
     let mut all_instructions = vec![
         ComputeBudgetInstruction::set_compute_unit_limit(units as u32),
-        ComputeBudgetInstruction::set_compute_unit_price(0),
+        ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
     ];
     all_instructions.extend_from_slice(instructions);
 
