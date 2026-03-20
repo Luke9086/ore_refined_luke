@@ -208,7 +208,7 @@ async fn on_chain_main(
         if slot_left > 1 {
             let simulate_result = simulate_transaction(&rpc, &payer, &ixs).await?;
             let mut units_consumed = simulate_result.value.units_consumed.unwrap_or(0);
-            units_consumed = (units_consumed * 11 / 10).max(200_000);
+            units_consumed = (units_consumed * 15 / 10).max(200_000);
 
             if simulate_result.value.err.is_some() {
                 info!(
