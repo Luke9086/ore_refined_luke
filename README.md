@@ -17,6 +17,13 @@ The miner "iore" with the highest conversion rate was created by me
 
 ## How to use it
 
+### Prerequisites
+
+Before running the program, you must create a miner account on-chain:
+
+1. Go to https://ore.supply/
+2. Connect your wallet and mine once manually to create your miner account.
+
 ### Build from source code
 
 1. Download the source code
@@ -45,33 +52,6 @@ REMAINING_SLOTS=5
 4. Run the binary
 ```sh
 ./target/release/ore-refined
-```
-
-### Pre-built binary
-1. Clone the project
-```bash
-$ git clone https://github.com/xintai6660707/ore_refined.git
-$ cd ore_refined
-```
-2. Create a `.env` file in the project root with your configuration:
-```env
-RPC_URL=https://your-rpc-endpoint
-KEYPAIR_PATH=/path/to/your/keypair.json
-PER_ROUND_DEPLOY_AMOUNT=0.01
-ORE_REFINED_RATE=1.3
-REMAINING_SLOTS=5
-```
-
-3. Run the release binary for your platform
-```sh
-# Linux x86_64
-./target/release/ore-refined
-
-# macOS (arm)
-./target/release/ore-refined-mac
-
-# Windows
-.\target\release\ore-refined-windows.exe
 ```
 
 ## Mining optimization parameters
