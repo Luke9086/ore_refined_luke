@@ -33,9 +33,18 @@ $ ./cargo build --release
 ```
 
 
-3. run the following command
+3. Create a `.env` file in the project root with your configuration:
+```env
+RPC_URL=https://your-rpc-endpoint
+KEYPAIR_PATH=/path/to/your/keypair.json
+PER_ROUND_DEPLOY_AMOUNT=0.01
+ORE_REFINED_RATE=1.3
+REMAINING_SLOTS=5
+```
+
+4. Run the binary
 ```sh
-./target/release/ore-refined  --rpc YOUR_RPC_ADDRESS --keypair YOUR_SOLANA_KEYPAIR_PATH --per-round-deploy-amount AMOUNT
+./target/release/ore-refined
 ```
 
 ### Pre-built binary
@@ -44,19 +53,38 @@ $ ./cargo build --release
 $ git clone https://github.com/xintai6660707/ore_refined.git
 $ cd ore_refined
 ```
-2. Run the command with the release file
+2. Create a `.env` file in the project root with your configuration:
+```env
+RPC_URL=https://your-rpc-endpoint
+KEYPAIR_PATH=/path/to/your/keypair.json
+PER_ROUND_DEPLOY_AMOUNT=0.01
+ORE_REFINED_RATE=1.3
+REMAINING_SLOTS=5
+```
+
+3. Run the release binary for your platform
 ```sh
 # Linux x86_64
-./target/release/ore-refined --rpc YOUR_RPC_ADDRESS --keypair YOUR_SOLANA_KEYPAIR_PATH --per-round-deploy-amount AMOUNT
+./target/release/ore-refined
 
 # macOS (arm)
-./target/release/ore-refined-mac --rpc YOUR_RPC_ADDRESS --keypair YOUR_SOLANA_KEYPAIR_PATH --per-round-deploy-amount AMOUNT
+./target/release/ore-refined-mac
 
 # Windows
-.\target\release\ore-refined-windows.exe --rpc YOUR_RPC_ADDRESS --keypair YOUR_SOLANA_KEYPAIR_PATH --per-round-deploy-amount AMOUNT
+.\target\release\ore-refined-windows.exe
 ```
 
 ## Mining optimization parameters
+
+### .env variables
+
+| Variable | Description |
+|---|---|
+| `RPC_URL` | Your Solana RPC endpoint URL |
+| `KEYPAIR_PATH` | Path to your Solana keypair JSON file |
+| `PER_ROUND_DEPLOY_AMOUNT` | SOL amount to deploy per round |
+| `ORE_REFINED_RATE` | Max ORE accepted per 1 unclaimed ORE (see below) |
+| `REMAINING_SLOTS` | Only deploy in the final N slots of each round (see below) |
 
 ### 1. remaining_slots
 Deploy only in the final N slots of each round. For example, remaining_slots = 5 limits deployments to the last 5 slots (one slot ≈ 400 ms). Deploying later reduces the chance other deployments change the EV before your transaction lands, but setting this too low may miss rounds.
