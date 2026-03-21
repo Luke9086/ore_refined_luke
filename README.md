@@ -29,8 +29,8 @@ Before running the program, you must create a miner account on-chain:
 1. Download the source code
 
 ```bash
-$ git clone https://github.com/xintai6660707/ore_refined.git
-$ cd ore_refined
+$ git clone git@github.com:Luke9086/ore_refined_luke.git
+$ cd ore_refined_luke
 ```
 
 2.  Build
