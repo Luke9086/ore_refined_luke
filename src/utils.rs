@@ -1,35 +1,35 @@
-use std::str::FromStr;
-use std::sync::Arc;
+use crate::jito::send_bundle;
+use crate::{DEFALUT_UNITS, jito};
 use anchor_lang::pubkey;
 use log::info;
 use ore_api::prelude::*;
 use solana_account_decoder::UiAccountEncoding;
+use solana_client::rpc_response::{RpcResult, RpcSimulateTransactionResult};
 use solana_client::{
-    client_error::{reqwest::StatusCode, ClientErrorKind},
+    client_error::{ClientErrorKind, reqwest::StatusCode},
     nonblocking::rpc_client::RpcClient,
     rpc_config::{RpcAccountInfoConfig, RpcProgramAccountsConfig},
     rpc_filter::{Memcmp, RpcFilterType},
 };
-use solana_client::rpc_response::{RpcResult, RpcSimulateTransactionResult};
 use solana_program::address_lookup_table::AddressLookupTableAccount;
 use solana_program::instruction::Instruction;
 use solana_program::slot_hashes::SlotHashes;
+use solana_sdk::message::{VersionedMessage, v0};
+use solana_sdk::native_token::lamports_to_sol;
+use solana_sdk::signature::{Keypair, Signature};
+use solana_sdk::transaction::VersionedTransaction;
 use solana_sdk::{
     compute_budget::ComputeBudgetInstruction,
     keccak::hash,
     pubkey::Pubkey,
-    signature::{read_keypair_file, Signer},
+    signature::{Signer, read_keypair_file},
     transaction::Transaction,
 };
-use solana_sdk::message::{v0, VersionedMessage};
-use solana_sdk::native_token::lamports_to_sol;
-use solana_sdk::signature::{Keypair, Signature};
-use solana_sdk::transaction::VersionedTransaction;
 use spl_associated_token_account::get_associated_token_address;
 use spl_token::amount_to_ui_amount;
+use std::str::FromStr;
+use std::sync::Arc;
 use steel::{AccountDeserialize, Clock, Discriminator};
-use crate::{jito, DEFALUT_UNITS};
-use crate::jito::send_bundle;
 
 pub async fn get_board(rpc: &RpcClient) -> Result<Board, anyhow::Error> {
     let board_pda = ore_api::state::board_pda();
@@ -37,7 +37,6 @@ pub async fn get_board(rpc: &RpcClient) -> Result<Board, anyhow::Error> {
     let board = Board::try_from_bytes(&account.data)?;
     Ok(*board)
 }
-
 
 pub async fn get_round(rpc: &RpcClient, id: u64) -> Result<Round, anyhow::Error> {
     let round_pda = ore_api::state::round_pda(id);
@@ -79,7 +78,7 @@ pub async fn claim(
 ) -> Result<(), anyhow::Error> {
     // let ix = ore_api::sdk::claim_ore(payer.pubkey(), u64::MAX);
     let ix2 = ore_api::sdk::claim_sol(payer.pubkey());
-    submit_transaction_with_ixs(rpc, payer, &[ix2],DEFALUT_UNITS).await?;
+    submit_transaction_with_ixs(rpc, payer, &[ix2], DEFALUT_UNITS).await?;
     Ok(())
 }
 
@@ -106,16 +105,15 @@ pub async fn simulate_transaction(
         .await;
     info!("Simulation result: {:?}", x);
 
-    return x
+    return x;
 }
-
 
 pub async fn build_multi_sign_transaction(
     rpc: &RpcClient,
     payer: &solana_sdk::signer::keypair::Keypair,
     pairs: &Vec<Arc<Keypair>>,
     instructions: &[solana_sdk::instruction::Instruction],
-    address_lookup_table_accounts: &Vec<AddressLookupTableAccount>
+    address_lookup_table_accounts: &Vec<AddressLookupTableAccount>,
 ) -> anyhow::Result<VersionedTransaction> {
     let blockhash = rpc.get_latest_blockhash().await?;
     let mut all_instructions = vec![
@@ -124,19 +122,21 @@ pub async fn build_multi_sign_transaction(
     ];
     all_instructions.extend_from_slice(instructions);
 
-
-    info!("Building transaction with {} signers", pairs.len()+1);
+    info!("Building transaction with {} signers", pairs.len() + 1);
     info!("Transaction has {} instructions", all_instructions.len());
     let transaction = VersionedTransaction::try_new(
-        VersionedMessage::V0(v0::Message::try_compile(
-            &payer.pubkey(),
-            &all_instructions,
-            address_lookup_table_accounts,
-            blockhash.clone(),
-        ).unwrap()),
+        VersionedMessage::V0(
+            v0::Message::try_compile(
+                &payer.pubkey(),
+                &all_instructions,
+                address_lookup_table_accounts,
+                blockhash.clone(),
+            )
+            .unwrap(),
+        ),
         pairs,
-    ).unwrap();
-
+    )
+    .unwrap();
 
     Ok(transaction)
 }
@@ -147,9 +147,10 @@ pub async fn submit_transaction_with_ixs(
     units: u64,
 ) -> Result<(), anyhow::Error> {
     let blockhash = rpc.get_latest_blockhash().await?;
+    let priority_fee = get_p75_priority_fee(rpc).await.max(20000);
     let mut all_instructions = vec![
-        ComputeBudgetInstruction::set_compute_unit_limit((units * 11 / 10)as u32 ),
-        ComputeBudgetInstruction::set_compute_unit_price(20000),
+        ComputeBudgetInstruction::set_compute_unit_limit((units * 15 / 10) as u32),
+        ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
     ];
     all_instructions.extend_from_slice(instructions);
     let transaction = Transaction::new_signed_with_payer(
@@ -163,7 +164,8 @@ pub async fn submit_transaction_with_ixs(
         skip_preflight: true,
         ..Default::default()
     };
-    rpc.send_transaction_with_config(&transaction,config).await?;
+    rpc.send_transaction_with_config(&transaction, config)
+        .await?;
     info!("Transaction sent: {}", transaction.signatures[0]);
     Ok(())
 }
@@ -186,7 +188,6 @@ pub async fn send_ix_use_jito(
     instructions: &[solana_sdk::instruction::Instruction],
     units: u64,
 ) -> anyhow::Result<()> {
-
     let priority_fee = get_p75_priority_fee(rpc).await;
     let blockhash = rpc.get_latest_blockhash().await?;
     let mut all_instructions = vec![
@@ -197,22 +198,23 @@ pub async fn send_ix_use_jito(
 
     let jito_ixs = [jito::build_bribe_ix(&payer.pubkey(), 5000)];
     let transaction = VersionedTransaction::try_new(
-        VersionedMessage::V0(v0::Message::try_compile(
-            &payer.pubkey(),
-            &vec![jito_ixs.as_slice(), &all_instructions].concat(),
-            &vec![],
-            blockhash.clone(),
-        ).unwrap()),
+        VersionedMessage::V0(
+            v0::Message::try_compile(
+                &payer.pubkey(),
+                &vec![jito_ixs.as_slice(), &all_instructions].concat(),
+                &vec![],
+                blockhash.clone(),
+            )
+            .unwrap(),
+        ),
         &[&payer],
-    ).unwrap();
-
+    )
+    .unwrap();
 
     send_bundle(vec![transaction]).await?;
 
     Ok(())
-
 }
-
 
 pub(crate) async fn get_program_accounts<T>(
     client: &RpcClient,
@@ -271,7 +273,6 @@ where
         },
     }
 }
-
 
 pub async fn log_treasury(rpc: &RpcClient) -> Result<(), anyhow::Error> {
     let treasury_address = ore_api::state::treasury_pda().0;
