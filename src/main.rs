@@ -151,7 +151,6 @@ async fn on_chain_main(
     update_round_loop(rpc.clone(), round_mutex.clone(), board_mutex.clone()).await?;
 
     let mut last_round_id = 0_u64;
-    let mut sent = false;
     let mut req_id = 0;
     let (mut ore_price, mut sol_price) = get_price().await?;
 
@@ -168,7 +167,6 @@ async fn on_chain_main(
         if last_round_id != round_id {
             info!("New round detected: {}", round_id);
             last_round_id = round_id;
-            sent = false;
             (ore_price, sol_price) = get_price().await?;
             info!("ORE price: {} USDC", ore_price);
             info!("SOL price: {} USDC", sol_price);
@@ -183,11 +181,6 @@ async fn on_chain_main(
         );
 
         if slot_left > args.remaining_slots as u64 {
-            continue;
-        }
-
-        if sent {
-            info!("already sent for this round");
             continue;
         }
 
@@ -228,8 +221,6 @@ async fn on_chain_main(
                     let result =
                         send_ix_use_jito(&rpc_clone, &payer_clone, &ixs, units_consumed).await;
                 });
-
-                sent = true;
             }
         }
     }
