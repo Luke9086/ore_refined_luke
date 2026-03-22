@@ -159,7 +159,7 @@ async fn on_chain_main(
         req_id += 1;
         req_id = req_id % 100;
         // checkpoint(rpc.clone(), payer, miner_mutex.clone(), board_mutex.clone()).await?;
-        tokio::time::sleep(tokio::time::Duration::from_millis(800)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
         let board = board_mutex.lock().await.clone();
         let clock = clock_mutex.lock().await.clone();
         let miner = miner_mutex.lock().await.clone();
