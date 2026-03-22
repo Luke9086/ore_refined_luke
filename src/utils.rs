@@ -146,10 +146,14 @@ pub async fn submit_transaction_with_ixs(
     instructions: &[solana_sdk::instruction::Instruction],
     units: u64,
 ) -> Result<(), anyhow::Error> {
-    let blockhash = rpc.get_latest_blockhash().await?;
-    let priority_fee = get_p75_priority_fee(rpc).await.max(20000);
+    let (blockhash, priority_fee) = tokio::join!(
+        rpc.get_latest_blockhash(),
+        get_p75_priority_fee(rpc),
+    );
+    let blockhash = blockhash?;
+    let priority_fee = priority_fee.max(20000);
     let mut all_instructions = vec![
-        ComputeBudgetInstruction::set_compute_unit_limit((units * 15 / 10) as u32),
+        ComputeBudgetInstruction::set_compute_unit_limit(units as u32),
         ComputeBudgetInstruction::set_compute_unit_price(priority_fee),
     ];
     all_instructions.extend_from_slice(instructions);
@@ -188,8 +192,11 @@ pub async fn send_ix_use_jito(
     instructions: &[solana_sdk::instruction::Instruction],
     units: u64,
 ) -> anyhow::Result<()> {
-    let priority_fee = get_p75_priority_fee(rpc).await;
-    let blockhash = rpc.get_latest_blockhash().await?;
+    let (priority_fee, blockhash) = tokio::join!(
+        get_p75_priority_fee(rpc),
+        rpc.get_latest_blockhash(),
+    );
+    let blockhash = blockhash?;
     let mut all_instructions = vec![
         ComputeBudgetInstruction::set_compute_unit_limit(units as u32),
         ComputeBudgetInstruction::set_compute_unit_price(priority_fee),

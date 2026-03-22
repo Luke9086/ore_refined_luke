@@ -150,15 +150,16 @@ async fn on_chain_main(
     update_miner_loop(rpc.clone(), payer.clone(), miner_mutex.clone()).await?;
     update_round_loop(rpc.clone(), round_mutex.clone(), board_mutex.clone()).await?;
 
-    let mut last_round_id = 0_u64;
+    let mut last_round_id: u64 = 0_u64;
     let mut req_id = 0;
+    let mut sent = false;
     let (mut ore_price, mut sol_price) = get_price().await?;
 
     loop {
         req_id += 1;
         req_id = req_id % 100;
         // checkpoint(rpc.clone(), payer, miner_mutex.clone(), board_mutex.clone()).await?;
-        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
         let board = board_mutex.lock().await.clone();
         let clock = clock_mutex.lock().await.clone();
         let miner = miner_mutex.lock().await.clone();
@@ -167,20 +168,25 @@ async fn on_chain_main(
         if last_round_id != round_id {
             info!("New round detected: {}", round_id);
             last_round_id = round_id;
+            sent = false;
             (ore_price, sol_price) = get_price().await?;
             info!("ORE price: {} USDC", ore_price);
             info!("SOL price: {} USDC", sol_price);
         }
 
-        // let current_slot = rpc.get_slot().await.unwrap_or(clock.slot);
-        let slot_left = board.end_slot.saturating_sub(clock.slot);
+        let current_slot = rpc.get_slot().await.unwrap_or(clock.slot);
+        let slot_left = board.end_slot.saturating_sub(current_slot);
 
         info!(
             "round_id: {:?} slot_left: {:?} current_slot: {:?}",
-            round_id, slot_left, clock.slot
+            round_id, slot_left, current_slot
         );
 
         if slot_left > args.remaining_slots as u64 {
+            continue;
+        }
+
+        if sent {
             continue;
         }
 
@@ -199,28 +205,43 @@ async fn on_chain_main(
         let ixs = [checkpoint_ix.clone(), refined_ix.clone(), claim_sol_ix];
 
         if slot_left > 1 {
-            let simulate_result = simulate_transaction(&rpc, &payer, &ixs).await?;
-            let mut units_consumed = simulate_result.value.units_consumed.unwrap_or(0);
-            units_consumed = (units_consumed * 15 / 10).max(200_000);
-
-            if simulate_result.value.err.is_some() {
-                info!(
-                    "simulate transaction failed: {:?}",
-                    simulate_result.value.err
-                );
-                continue;
-            } else {
-                //send ixs by rpc
-                submit_transaction_with_ixs(&rpc, &payer, &ixs, units_consumed).await?;
-
-                //send ixs by jito
-                req_id += 1;
+            // For urgent slots skip simulation to save one RPC round-trip.
+            let urgent = slot_left <= 3;
+            if urgent {
+                let units = DEFALUT_UNITS;
+                submit_transaction_with_ixs(&rpc, &payer, &ixs, units).await?;
+                sent = true;
                 let rpc_clone = rpc.clone();
                 let payer_clone = payer.clone();
                 tokio::spawn(async move {
-                    let result =
-                        send_ix_use_jito(&rpc_clone, &payer_clone, &ixs, units_consumed).await;
+                    let _ = send_ix_use_jito(&rpc_clone, &payer_clone, &ixs, units).await;
                 });
+            } else {
+                let simulate_result = simulate_transaction(&rpc, &payer, &ixs).await?;
+                // Apply 1.5× buffer here; submit_transaction_with_ixs uses the value as-is.
+                let units_consumed =
+                    (simulate_result.value.units_consumed.unwrap_or(0) * 15 / 10).max(200_000);
+
+                if simulate_result.value.err.is_some() {
+                    info!(
+                        "simulate transaction failed: {:?}",
+                        simulate_result.value.err
+                    );
+                    continue;
+                } else {
+                    //send ixs by rpc
+                    submit_transaction_with_ixs(&rpc, &payer, &ixs, units_consumed).await?;
+                    sent = true;
+
+                    //send ixs by jito
+                    req_id += 1;
+                    let rpc_clone = rpc.clone();
+                    let payer_clone = payer.clone();
+                    tokio::spawn(async move {
+                        let _ =
+                            send_ix_use_jito(&rpc_clone, &payer_clone, &ixs, units_consumed).await;
+                    });
+                }
             }
         }
     }
