@@ -2680,14 +2680,15 @@ dependencies = [
 
 [[package]]
 name = "ore-api"
-version = "3.7.27"
-source = "git+https://github.com/regolith-labs/ore?branch=master#9d8521c332e2636ad24b0ce365f26972ee8dd117"
+version = "3.8.2"
+source = "git+https://github.com/regolith-labs/ore?branch=master#217d8795bfb1d904fda0c3c56d8adc6b619024c8"
 dependencies = [
  "base64 0.22.1",
  "bytemuck",
  "entropy-api",
  "num_enum",
  "ore-mint-api",
+ "ore-stake-api",
  "serde",
  "solana-program",
  "spl-associated-token-account",
@@ -2743,6 +2744,23 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "ore-stake-api"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "814ca1eee49bfb5d5b59c64131f815562e3c0d16d68f462d790fb7ddedad2dc5"
+dependencies = [
+ "base64 0.22.1",
+ "bytemuck",
+ "num_enum",
+ "serde",
+ "solana-program",
+ "spl-associated-token-account",
+ "spl-token 4.0.2",
+ "steel",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
