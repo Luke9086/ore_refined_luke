@@ -199,42 +199,29 @@ async fn on_chain_main(
         let ixs = [checkpoint_ix.clone(), refined_ix.clone(), claim_sol_ix];
 
         if slot_left > 1 {
-            // For urgent slots skip simulation to save one RPC round-trip.
-            let urgent = slot_left <= 3;
-            if urgent {
-                let units = DEFALUT_UNITS;
-                submit_transaction_with_ixs(&rpc, &payer, &ixs, units).await?;
+            // Always simulate before sending.
+            let simulate_result = simulate_transaction(&rpc, &payer, &ixs).await?;
+            // Apply 1.5× buffer here; submit_transaction_with_ixs uses the value as-is.
+            let units_consumed =
+                (simulate_result.value.units_consumed.unwrap_or(0) * 15 / 10).max(200_000);
+
+            if simulate_result.value.err.is_some() {
+                info!(
+                    "simulate transaction failed: {:?}",
+                    simulate_result.value.err
+                );
+                continue;
+            } else {
+                //send ixs by rpc
+                submit_transaction_with_ixs(&rpc, &payer, &ixs, units_consumed).await?;
                 sent = true;
+
+                //send ixs by jito
                 let rpc_clone = rpc.clone();
                 let payer_clone = payer.clone();
                 tokio::spawn(async move {
-                    let _ = send_ix_use_jito(&rpc_clone, &payer_clone, &ixs, units).await;
+                    let _ = send_ix_use_jito(&rpc_clone, &payer_clone, &ixs, units_consumed).await;
                 });
-            } else {
-                let simulate_result = simulate_transaction(&rpc, &payer, &ixs).await?;
-                // Apply 1.5× buffer here; submit_transaction_with_ixs uses the value as-is.
-                let units_consumed =
-                    (simulate_result.value.units_consumed.unwrap_or(0) * 15 / 10).max(200_000);
-
-                if simulate_result.value.err.is_some() {
-                    info!(
-                        "simulate transaction failed: {:?}",
-                        simulate_result.value.err
-                    );
-                    continue;
-                } else {
-                    //send ixs by rpc
-                    submit_transaction_with_ixs(&rpc, &payer, &ixs, units_consumed).await?;
-                    sent = true;
-
-                    //send ixs by jito
-                    let rpc_clone = rpc.clone();
-                    let payer_clone = payer.clone();
-                    tokio::spawn(async move {
-                        let _ =
-                            send_ix_use_jito(&rpc_clone, &payer_clone, &ixs, units_consumed).await;
-                    });
-                }
             }
         }
     }
