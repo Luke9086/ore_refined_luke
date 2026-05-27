@@ -228,7 +228,6 @@ async fn on_chain_main(
                     sent = true;
 
                     //send ixs by jito
-                    req_id += 1;
                     let rpc_clone = rpc.clone();
                     let payer_clone = payer.clone();
                     tokio::spawn(async move {
