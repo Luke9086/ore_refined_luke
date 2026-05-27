@@ -1,91 +1,71 @@
-use std::collections::HashSet;
-use std::fs;
-use std::rc::Rc;
-use std::sync::Arc;
-use ore_api::consts::MINT_ADDRESS;
-// use ore_api::prelude::{block_pda, config_pda, market_pda, miner_pda, vault_address, Block, Config, Market, Miner, SwapDirection, SwapPrecision};
+use anchor_lang::pubkey;
+use entropy_api::state::var_pda as entropy_var_pda;
+use log::info;
+use ore_api::prelude::{automation_pda, board_pda, miner_pda};
+use ore_api::state::round_pda;
 use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::pubkey::Pubkey;
-use solana_program::{system_program, sysvar};
-use anchor_client::{
-    solana_client::rpc_client::RpcClient,
-    solana_sdk::{
-        commitment_config::CommitmentConfig, native_token::LAMPORTS_PER_SOL, signature::Keypair,
-        signer::Signer,
-    },
-    Client, Cluster,
-};
-use anchor_lang::prelude::*;
-use log::info;
-use ore_api::prelude::{automation_pda, board_pda, miner_pda, treasury_pda};
-use ore_api::state::{config_pda, round_pda};
-use entropy_api::state::var_pda as entropy_var_pda;
-use spl_associated_token_account::get_associated_token_address;
+use solana_program::system_program;
 
-declare_program!(ore_por_program);
-use ore_por_program::{ client::accounts, client::args};
+/// The `ore_ev_program` (ev deploy) on-chain program.
+pub const ORE_EV_PROGRAM_ID: Pubkey = pubkey!("9VFRL5mrqTYBCitfeB4gFSTRBxwi72CkwuqFvokzXdCr");
+/// The real ORE program — CPI target of the ev deploy instruction.
+pub const ORE_PROGRAM_ID: Pubkey = pubkey!("oreV3EG1i9BEgiAJ8b177Z2S2rMarzak4NMv1kULvWv");
+/// Entropy program — invoked by the ORE deploy CPI to sample randomness.
+pub const ENTROPY_PROGRAM_ID: Pubkey = pubkey!("3jSkUuYBoJzQPMEzTvkDFXCZUBksPamrVhrnHR9igu2X");
 
+/// 1-byte instruction discriminator for `oreDeploy`.
+const ORE_DEPLOY_DISCRIMINATOR: u8 = 1;
+
+/// Build the `oreDeploy` instruction for the `ore_ev_program`.
+///
+/// The program reads the live ORE round, computes Kelly-optimal bets on the
+/// smallest blocks, filters by the EV threshold, and deploys across them via CPI.
+///
+/// Instruction data is a fixed 25-byte layout:
+/// `[discriminator: u8][total_amount: u64][ore_price_lamports: u64][min_ev_threshold_bps: i16][num_blocks: u8][padding: 5]`
 pub fn get_ore_refined_ix(
     signer: Pubkey,
     round_id: u64,
-    ore_price: f64,
-    sol_price: f64,
-    deploy_amount: u64,
-    remaining_slots: u8,
-    ore_refined_rate: f64,
-    req_id: u8,
+    total_amount: u64,
+    ore_price_lamports: u64,
+    min_ev_threshold_bps: i16,
+    num_blocks: u8,
 ) -> anyhow::Result<Instruction> {
-
-    info!("deploy_amount: {:?}",deploy_amount);
-
-
-    let url = Cluster::Custom(
-        "http://localhost:8899".to_string(),
-        "ws://127.0.0.1:8900".to_string(),
+    info!(
+        "total_amount: {} ore_price_lamports: {} min_ev_threshold_bps: {} num_blocks: {}",
+        total_amount, ore_price_lamports, min_ev_threshold_bps, num_blocks
     );
 
-    let payer = Arc::new(Keypair::new());
-    let program_client = Client::new(url.clone(), payer.clone());
-    // Create program client
-    let provider = Client::new_with_options(
-        Cluster::Localnet,
-        Rc::new(payer),
-        CommitmentConfig::confirmed(),
-    );
-    let program = provider.program(ore_por_program::ID)?;
+    // signer and authority are the same key in this client.
+    let authority = signer;
 
-    let accounts = accounts::Refined {
-        signer,
-        authority: signer,
-        automation: automation_pda(signer).0,
-        board: board_pda().0,
-        config: config_pda().0,
-        miner: miner_pda(signer).0,
-        round: round_pda(round_id).0,
-        treasury: treasury_pda().0,
-        system_program: system_program::ID,
-        ore_program: pubkey!("oreV3EG1i9BEgiAJ8b177Z2S2rMarzak4NMv1kULvWv"),
-        entropy_var: entropy_var_pda(board_pda().0, 0).0,
-        entropy_program: pubkey!("3jSkUuYBoJzQPMEzTvkDFXCZUBksPamrVhrnHR9igu2X"),
-        fee: pubkey!("7cgWfSmeAkr7WhRgg6UEjWmYQpV644q5M2d6E1Rmbr18")
-    };
+    // Account order must match the IDL exactly.
+    let accounts = vec![
+        AccountMeta::new_readonly(ORE_PROGRAM_ID, false),
+        AccountMeta::new(signer, true),
+        AccountMeta::new(authority, true),
+        AccountMeta::new(automation_pda(authority).0, false),
+        AccountMeta::new(board_pda().0, false),
+        AccountMeta::new(miner_pda(authority).0, false),
+        AccountMeta::new(round_pda(round_id).0, false),
+        AccountMeta::new_readonly(system_program::ID, false),
+        AccountMeta::new(entropy_var_pda(board_pda().0, 0).0, false),
+        AccountMeta::new_readonly(ENTROPY_PROGRAM_ID, false),
+    ];
 
+    // Fixed 25-byte instruction data (little-endian).
+    let mut data = Vec::with_capacity(25);
+    data.push(ORE_DEPLOY_DISCRIMINATOR);
+    data.extend_from_slice(&total_amount.to_le_bytes());
+    data.extend_from_slice(&ore_price_lamports.to_le_bytes());
+    data.extend_from_slice(&min_ev_threshold_bps.to_le_bytes());
+    data.push(num_blocks);
+    data.extend_from_slice(&[0u8; 5]); // padding
 
-
-
-    let swap_ix = program.request()
-        .accounts(accounts)
-        // Remaining accounts
-        .args(args::Refined{
-            ore_price,
-            sol_price,
-            amount: deploy_amount,
-            remaining_slots,
-            ore_refined_rate,
-            _req_id: req_id
-        })
-        .instructions()?.remove(0);
-
-
-    Ok(swap_ix)
+    Ok(Instruction {
+        program_id: ORE_EV_PROGRAM_ID,
+        accounts,
+        data,
+    })
 }

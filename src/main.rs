@@ -10,7 +10,6 @@ use crate::history::get_history_winners;
 use crate::jito::send_bundle;
 use crate::onchain_main::get_ore_refined_ix;
 use crate::price::get_price;
-use anchor_lang::declare_program;
 use anchor_lang::prelude::*;
 use ore_api::prelude::{automation_pda, *};
 use rand::Rng;
@@ -42,8 +41,6 @@ use tokio::select;
 use tokio::sync::Mutex;
 use tracing::info;
 use utils::*;
-
-declare_program!(ore_por_program);
 
 pub const DEFALUT_UNITS: u64 = 400_000;
 #[tokio::main]
@@ -151,13 +148,10 @@ async fn on_chain_main(
     update_round_loop(rpc.clone(), round_mutex.clone(), board_mutex.clone()).await?;
 
     let mut last_round_id: u64 = 0_u64;
-    let mut req_id = 0;
     let mut sent = false;
     let (mut ore_price, mut sol_price) = get_price().await?;
 
     loop {
-        req_id += 1;
-        req_id = req_id % 100;
         // checkpoint(rpc.clone(), payer, miner_mutex.clone(), board_mutex.clone()).await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
         let board = board_mutex.lock().await.clone();
@@ -191,15 +185,15 @@ async fn on_chain_main(
         }
 
         let checkpoint_ix = checkpoint(payer.pubkey(), payer.pubkey(), miner.round_id);
+        // ORE price expressed in lamports: (ore_usd / sol_usd) * LAMPORTS_PER_SOL.
+        let ore_price_lamports = (ore_price / sol_price * 1e9f64) as u64;
         let refined_ix = get_ore_refined_ix(
             payer.pubkey(),
             round_id,
-            ore_price,
-            sol_price,
             (args.per_round_deploy_amount * 1e9f64) as u64,
-            args.remaining_slots,
-            args.ore_refined_rate,
-            req_id,
+            ore_price_lamports,
+            args.min_ev_threshold_bps,
+            args.num_blocks,
         )?;
         let claim_sol_ix = claim_sol(payer.pubkey());
         let ixs = [checkpoint_ix.clone(), refined_ix.clone(), claim_sol_ix];
@@ -377,10 +371,19 @@ struct Args {
 
     #[arg(
         long,
-        value_name = "ORE_REFINED_RATE",
-        help = "The refined rate of ORE you expect to get when deploying SOL. e.g. 1.3 means 1.3 ORE can be refined to 1 unclaimed ORE. The minimum is 1.1.",
-        default_value = "1.3",
-        env = "ORE_REFINED_RATE"
+        value_name = "MIN_EV_THRESHOLD_BPS",
+        help = "Minimum acceptable expected value in basis points (e.g. -500 = accept -5%). Blocks below this EV are skipped.",
+        default_value = "-500",
+        env = "MIN_EV_THRESHOLD_BPS"
     )]
-    ore_refined_rate: f64,
+    min_ev_threshold_bps: i16,
+
+    #[arg(
+        long,
+        value_name = "NUM_BLOCKS",
+        help = "Number of smallest blocks to target (1-5).",
+        default_value = "5",
+        env = "NUM_BLOCKS"
+    )]
+    num_blocks: u8,
 }
