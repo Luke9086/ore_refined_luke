@@ -1,7 +1,7 @@
 use anchor_lang::pubkey;
 use entropy_api::state::var_pda as entropy_var_pda;
 use log::info;
-use ore_api::prelude::{automation_pda, board_pda, miner_pda};
+use ore_api::prelude::{automation_pda, board_pda, config_pda, miner_pda};
 use ore_api::state::round_pda;
 use solana_program::instruction::{AccountMeta, Instruction};
 use solana_program::pubkey::Pubkey;
@@ -47,6 +47,7 @@ pub fn get_ore_refined_ix(
         AccountMeta::new(authority, true),
         AccountMeta::new(automation_pda(authority).0, false),
         AccountMeta::new(board_pda().0, false),
+        AccountMeta::new(config_pda().0, false),
         AccountMeta::new(miner_pda(authority).0, false),
         AccountMeta::new(round_pda(round_id).0, false),
         AccountMeta::new_readonly(system_program::ID, false),
