@@ -23,18 +23,18 @@ const ORE_DEPLOY_DISCRIMINATOR: u8 = 1;
 /// smallest blocks, filters by the EV threshold, and deploys across them via CPI.
 ///
 /// Instruction data is a fixed 25-byte layout:
-/// `[discriminator: u8][total_amount: u64][ore_price_lamports: u64][min_ev_threshold_bps: i16][num_blocks: u8][padding: 5]`
+/// `[discriminator: u8][deploy_bps: u64][ore_price_lamports: u64][min_ev_threshold_bps: i16][num_blocks: u8][padding: 5]`
 pub fn get_ore_refined_ix(
     signer: Pubkey,
     round_id: u64,
-    total_amount: u64,
+    deploy_bps: u64,
     ore_price_lamports: u64,
     min_ev_threshold_bps: i16,
     num_blocks: u8,
 ) -> anyhow::Result<Instruction> {
     info!(
-        "total_amount: {} ore_price_lamports: {} min_ev_threshold_bps: {} num_blocks: {}",
-        total_amount, ore_price_lamports, min_ev_threshold_bps, num_blocks
+        "deploy_bps: {} ore_price_lamports: {} min_ev_threshold_bps: {} num_blocks: {}",
+        deploy_bps, ore_price_lamports, min_ev_threshold_bps, num_blocks
     );
 
     // signer and authority are the same key in this client.
@@ -58,7 +58,7 @@ pub fn get_ore_refined_ix(
     // Fixed 25-byte instruction data (little-endian).
     let mut data = Vec::with_capacity(25);
     data.push(ORE_DEPLOY_DISCRIMINATOR);
-    data.extend_from_slice(&total_amount.to_le_bytes());
+    data.extend_from_slice(&deploy_bps.to_le_bytes());
     data.extend_from_slice(&ore_price_lamports.to_le_bytes());
     data.extend_from_slice(&min_ev_threshold_bps.to_le_bytes());
     data.push(num_blocks);

@@ -190,7 +190,7 @@ async fn on_chain_main(
         let refined_ix = get_ore_refined_ix(
             payer.pubkey(),
             round_id,
-            (args.per_round_deploy_amount * 1e9f64) as u64,
+            args.deploy_bps,
             ore_price_lamports,
             args.min_ev_threshold_bps,
             args.num_blocks,
@@ -340,11 +340,12 @@ struct Args {
 
     #[arg(
         long,
-        value_name = "PER_ROUND_DEPLOY_AMOUNT",
-        help = "The amount of SOL you expect to deploy in each round",
-        env = "PER_ROUND_DEPLOY_AMOUNT"
+        value_name = "DEPLOY_BPS",
+        help = "Fraction of the signer SOL balance to deploy, in basis points (100 = 1%, 400 = 4%)",
+        default_value = "400",
+        env = "DEPLOY_BPS"
     )]
-    per_round_deploy_amount: f64,
+    deploy_bps: u64,
 
     #[arg(
         long,

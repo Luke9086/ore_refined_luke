@@ -1,1 +1,417 @@
-{"kind":"rootNode","standard":"codama","version":"1.6.0","program":{"kind":"programNode","name":"oreEvProgram","publicKey":"9VFRL5mrqTYBCitfeB4gFSTRBxwi72CkwuqFvokzXdCr","version":"0.1.0","origin":"shank","docs":[],"accounts":[{"kind":"accountNode","name":"oreRound","docs":["Mirror of the ORE program round account (read-only here)."],"data":{"kind":"structTypeNode","fields":[{"kind":"structFieldTypeNode","name":"discriminator","docs":[],"type":{"kind":"fixedSizeTypeNode","size":8,"type":{"kind":"bytesTypeNode"}}},{"kind":"structFieldTypeNode","name":"id","docs":[],"type":{"kind":"numberTypeNode","format":"u64","endian":"le"}},{"kind":"structFieldTypeNode","name":"deployed","docs":[],"type":{"kind":"arrayTypeNode","item":{"kind":"numberTypeNode","format":"u64","endian":"le"},"count":{"kind":"fixedCountNode","value":25}}},{"kind":"structFieldTypeNode","name":"slotHash","docs":[],"type":{"kind":"fixedSizeTypeNode","size":32,"type":{"kind":"bytesTypeNode"}}},{"kind":"structFieldTypeNode","name":"count","docs":[],"type":{"kind":"arrayTypeNode","item":{"kind":"numberTypeNode","format":"u64","endian":"le"},"count":{"kind":"fixedCountNode","value":25}}},{"kind":"structFieldTypeNode","name":"expiresAt","docs":[],"type":{"kind":"numberTypeNode","format":"u64","endian":"le"}},{"kind":"structFieldTypeNode","name":"motherlode","docs":[],"type":{"kind":"numberTypeNode","format":"u64","endian":"le"}},{"kind":"structFieldTypeNode","name":"rentPayer","docs":[],"type":{"kind":"publicKeyTypeNode"}},{"kind":"structFieldTypeNode","name":"topMiner","docs":[],"type":{"kind":"publicKeyTypeNode"}},{"kind":"structFieldTypeNode","name":"topMinerReward","docs":[],"type":{"kind":"numberTypeNode","format":"u64","endian":"le"}},{"kind":"structFieldTypeNode","name":"totalDeployed","docs":[],"type":{"kind":"numberTypeNode","format":"u64","endian":"le"}},{"kind":"structFieldTypeNode","name":"totalVaulted","docs":[],"type":{"kind":"numberTypeNode","format":"u64","endian":"le"}},{"kind":"structFieldTypeNode","name":"totalWinnings","docs":[],"type":{"kind":"numberTypeNode","format":"u64","endian":"le"}}]}}],"instructions":[{"kind":"instructionNode","name":"oreDeploy","docs":["Read the live ORE round, compute Kelly-optimal bets on the smallest","blocks, filter by the EV threshold, and deploy across them via CPI."],"optionalAccountStrategy":"programId","accounts":[{"kind":"instructionAccountNode","name":"oreProgram","isWritable":false,"isSigner":false,"isOptional":false,"docs":["The real ORE program (CPI target)."]},{"kind":"instructionAccountNode","name":"signer","isWritable":true,"isSigner":true,"isOptional":false,"docs":[]},{"kind":"instructionAccountNode","name":"authority","isWritable":true,"isSigner":true,"isOptional":false,"docs":[]},{"kind":"instructionAccountNode","name":"automation","isWritable":true,"isSigner":false,"isOptional":false,"docs":[]},{"kind":"instructionAccountNode","name":"board","isWritable":true,"isSigner":false,"isOptional":false,"docs":[]},{"kind":"instructionAccountNode","name":"miner","isWritable":true,"isSigner":false,"isOptional":false,"docs":[]},{"kind":"instructionAccountNode","name":"round","isWritable":true,"isSigner":false,"isOptional":false,"docs":["The OreRound account read for live deploy/motherlode data."]},{"kind":"instructionAccountNode","name":"systemProgram","isWritable":false,"isSigner":false,"isOptional":false,"docs":[],"defaultValue":{"kind":"publicKeyValueNode","publicKey":"11111111111111111111111111111111"}},{"kind":"instructionAccountNode","name":"entropyVar","isWritable":true,"isSigner":false,"isOptional":false,"docs":[]},{"kind":"instructionAccountNode","name":"entropyProgram","isWritable":false,"isSigner":false,"isOptional":false,"docs":[]}],"arguments":[{"kind":"instructionArgumentNode","name":"discriminator","defaultValueStrategy":"omitted","docs":[],"type":{"kind":"numberTypeNode","format":"u8","endian":"le"},"defaultValue":{"kind":"numberValueNode","number":1}},{"kind":"instructionArgumentNode","name":"totalAmount","docs":["Total SOL budget in lamports, allocated optimally across blocks."],"type":{"kind":"numberTypeNode","format":"u64","endian":"le"}},{"kind":"instructionArgumentNode","name":"orePriceLamports","docs":["Current ORE price in lamports, used to value the motherlode."],"type":{"kind":"numberTypeNode","format":"u64","endian":"le"}},{"kind":"instructionArgumentNode","name":"minEvThresholdBps","docs":["Minimum acceptable EV in basis points (e.g. -500 = accept -5%)."],"type":{"kind":"numberTypeNode","format":"i16","endian":"le"}},{"kind":"instructionArgumentNode","name":"numBlocks","docs":["Number of smallest blocks to target (1-5)."],"type":{"kind":"numberTypeNode","format":"u8","endian":"le"}},{"kind":"instructionArgumentNode","name":"padding","defaultValueStrategy":"omitted","docs":["Padding to a 24-byte fixed layout."],"type":{"kind":"fixedSizeTypeNode","size":5,"type":{"kind":"bytesTypeNode"}},"defaultValue":{"kind":"bytesValueNode","data":"0000000000","encoding":"base16"}}],"discriminators":[{"kind":"fieldDiscriminatorNode","name":"discriminator","offset":0}]}],"definedTypes":[],"pdas":[],"events":[],"errors":[{"kind":"errorNode","name":"writeOverflow","code":0,"message":"Arithmetic write overflow","docs":[]},{"kind":"errorNode","name":"invalidInstructionData","code":1,"message":"Invalid instruction data","docs":[]},{"kind":"errorNode","name":"pdaMismatch","code":2,"message":"PDA mismatch","docs":[]},{"kind":"errorNode","name":"invalidOwner","code":3,"message":"Invalid account owner","docs":[]},{"kind":"errorNode","name":"noPositiveEvBlocks","code":4,"message":"No blocks meet the EV threshold","docs":[]}]},"additionalPrograms":[]}
+{
+  "kind": "rootNode",
+  "standard": "codama",
+  "version": "1.6.0",
+  "program": {
+    "kind": "programNode",
+    "name": "oreEvProgram",
+    "publicKey": "9VFRL5mrqTYBCitfeB4gFSTRBxwi72CkwuqFvokzXdCr",
+    "version": "0.1.0",
+    "origin": "shank",
+    "docs": [],
+    "accounts": [
+      {
+        "kind": "accountNode",
+        "name": "oreRound",
+        "docs": [
+          "Mirror of the ORE program round account (read-only here)."
+        ],
+        "data": {
+          "kind": "structTypeNode",
+          "fields": [
+            {
+              "kind": "structFieldTypeNode",
+              "name": "discriminator",
+              "docs": [],
+              "type": {
+                "kind": "fixedSizeTypeNode",
+                "size": 8,
+                "type": {
+                  "kind": "bytesTypeNode"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "id",
+              "docs": [],
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "deployed",
+              "docs": [],
+              "type": {
+                "kind": "arrayTypeNode",
+                "item": {
+                  "kind": "numberTypeNode",
+                  "format": "u64",
+                  "endian": "le"
+                },
+                "count": {
+                  "kind": "fixedCountNode",
+                  "value": 25
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "slotHash",
+              "docs": [],
+              "type": {
+                "kind": "fixedSizeTypeNode",
+                "size": 32,
+                "type": {
+                  "kind": "bytesTypeNode"
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "count",
+              "docs": [],
+              "type": {
+                "kind": "arrayTypeNode",
+                "item": {
+                  "kind": "numberTypeNode",
+                  "format": "u64",
+                  "endian": "le"
+                },
+                "count": {
+                  "kind": "fixedCountNode",
+                  "value": 25
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "expiresAt",
+              "docs": [],
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "motherlode",
+              "docs": [],
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "rentPayer",
+              "docs": [],
+              "type": {
+                "kind": "publicKeyTypeNode"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "topMiner",
+              "docs": [],
+              "type": {
+                "kind": "publicKeyTypeNode"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "topMinerReward",
+              "docs": [],
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "totalDeployed",
+              "docs": [],
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "totalVaulted",
+              "docs": [],
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "totalWinnings",
+              "docs": [],
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "instructions": [
+      {
+        "kind": "instructionNode",
+        "name": "oreDeploy",
+        "docs": [
+          "Read the live ORE round, compute Kelly-optimal bets on the smallest",
+          "blocks, filter by the EV threshold, and deploy across them via CPI."
+        ],
+        "optionalAccountStrategy": "programId",
+        "accounts": [
+          {
+            "kind": "instructionAccountNode",
+            "name": "oreProgram",
+            "isWritable": false,
+            "isSigner": false,
+            "isOptional": false,
+            "docs": [
+              "The real ORE program (CPI target)."
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "signer",
+            "isWritable": true,
+            "isSigner": true,
+            "isOptional": false,
+            "docs": []
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "authority",
+            "isWritable": true,
+            "isSigner": true,
+            "isOptional": false,
+            "docs": []
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "automation",
+            "isWritable": true,
+            "isSigner": false,
+            "isOptional": false,
+            "docs": []
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "board",
+            "isWritable": true,
+            "isSigner": false,
+            "isOptional": false,
+            "docs": []
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "config",
+            "isWritable": true,
+            "isSigner": false,
+            "isOptional": false,
+            "docs": [
+              "ORE global config PDA, forwarded to the ORE deploy CPI."
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "miner",
+            "isWritable": true,
+            "isSigner": false,
+            "isOptional": false,
+            "docs": []
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "round",
+            "isWritable": true,
+            "isSigner": false,
+            "isOptional": false,
+            "docs": [
+              "The OreRound account read for live deploy/motherlode data."
+            ]
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "systemProgram",
+            "isWritable": false,
+            "isSigner": false,
+            "isOptional": false,
+            "docs": [],
+            "defaultValue": {
+              "kind": "publicKeyValueNode",
+              "publicKey": "11111111111111111111111111111111"
+            }
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "entropyVar",
+            "isWritable": true,
+            "isSigner": false,
+            "isOptional": false,
+            "docs": []
+          },
+          {
+            "kind": "instructionAccountNode",
+            "name": "entropyProgram",
+            "isWritable": false,
+            "isSigner": false,
+            "isOptional": false,
+            "docs": []
+          }
+        ],
+        "arguments": [
+          {
+            "kind": "instructionArgumentNode",
+            "name": "discriminator",
+            "defaultValueStrategy": "omitted",
+            "docs": [],
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            },
+            "defaultValue": {
+              "kind": "numberValueNode",
+              "number": 1
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "deployBps",
+            "docs": [
+              "Fraction of the signer SOL balance to deploy, in basis points",
+              "(100 = 1%, 400 = 4%). 0 defaults to 400 (4%) on-chain. The resulting",
+              "lamport budget is allocated optimally across blocks."
+            ],
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "orePriceLamports",
+            "docs": [
+              "Current ORE price in lamports, used to value the motherlode."
+            ],
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u64",
+              "endian": "le"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "minEvThresholdBps",
+            "docs": [
+              "Minimum acceptable EV in basis points (e.g. -500 = accept -5%)."
+            ],
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "i16",
+              "endian": "le"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "numBlocks",
+            "docs": [
+              "Number of smallest blocks to target (1-5)."
+            ],
+            "type": {
+              "kind": "numberTypeNode",
+              "format": "u8",
+              "endian": "le"
+            }
+          },
+          {
+            "kind": "instructionArgumentNode",
+            "name": "padding",
+            "defaultValueStrategy": "omitted",
+            "docs": [
+              "Padding to a 24-byte fixed layout."
+            ],
+            "type": {
+              "kind": "fixedSizeTypeNode",
+              "size": 5,
+              "type": {
+                "kind": "bytesTypeNode"
+              }
+            },
+            "defaultValue": {
+              "kind": "bytesValueNode",
+              "data": "0000000000",
+              "encoding": "base16"
+            }
+          }
+        ],
+        "discriminators": [
+          {
+            "kind": "fieldDiscriminatorNode",
+            "name": "discriminator",
+            "offset": 0
+          }
+        ]
+      }
+    ],
+    "definedTypes": [],
+    "pdas": [],
+    "events": [],
+    "errors": [
+      {
+        "kind": "errorNode",
+        "name": "writeOverflow",
+        "code": 0,
+        "message": "Arithmetic write overflow",
+        "docs": []
+      },
+      {
+        "kind": "errorNode",
+        "name": "invalidInstructionData",
+        "code": 1,
+        "message": "Invalid instruction data",
+        "docs": []
+      },
+      {
+        "kind": "errorNode",
+        "name": "pdaMismatch",
+        "code": 2,
+        "message": "PDA mismatch",
+        "docs": []
+      },
+      {
+        "kind": "errorNode",
+        "name": "invalidOwner",
+        "code": 3,
+        "message": "Invalid account owner",
+        "docs": []
+      },
+      {
+        "kind": "errorNode",
+        "name": "noPositiveEvBlocks",
+        "code": 4,
+        "message": "No blocks meet the EV threshold",
+        "docs": []
+      }
+    ]
+  },
+  "additionalPrograms": []
+}
