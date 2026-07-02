@@ -286,7 +286,6 @@ pub async fn log_treasury(rpc: &RpcClient) -> Result<(), anyhow::Error> {
     let treasury = get_treasury(rpc).await?;
     println!("Treasury");
     println!("  address: {}", treasury_address);
-    println!("  balance: {} SOL", lamports_to_sol(treasury.balance));
     println!(
         "  motherlode: {} ORE",
         amount_to_ui_amount(treasury.motherlode, TOKEN_DECIMALS)
@@ -294,14 +293,6 @@ pub async fn log_treasury(rpc: &RpcClient) -> Result<(), anyhow::Error> {
     println!(
         "  miner_rewards_factor: {}",
         treasury.miner_rewards_factor.to_i80f48().to_string()
-    );
-    println!(
-        "  stake_rewards_factor: {}",
-        treasury.stake_rewards_factor.to_i80f48().to_string()
-    );
-    println!(
-        "  total_staked: {} ORE",
-        amount_to_ui_amount(treasury.total_staked, TOKEN_DECIMALS)
     );
     println!(
         "  total_unclaimed: {} ORE",

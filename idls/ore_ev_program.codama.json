@@ -60,13 +60,18 @@
             },
             {
               "kind": "structFieldTypeNode",
-              "name": "slotHash",
+              "name": "mass",
               "docs": [],
               "type": {
-                "kind": "fixedSizeTypeNode",
-                "size": 32,
-                "type": {
-                  "kind": "bytesTypeNode"
+                "kind": "arrayTypeNode",
+                "item": {
+                  "kind": "numberTypeNode",
+                  "format": "u64",
+                  "endian": "le"
+                },
+                "count": {
+                  "kind": "fixedCountNode",
+                  "value": 25
                 }
               }
             },
@@ -84,6 +89,18 @@
                 "count": {
                   "kind": "fixedCountNode",
                   "value": 25
+                }
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "slotHash",
+              "docs": [],
+              "type": {
+                "kind": "fixedSizeTypeNode",
+                "size": 32,
+                "type": {
+                  "kind": "bytesTypeNode"
                 }
               }
             },
@@ -117,30 +134,19 @@
             },
             {
               "kind": "structFieldTypeNode",
-              "name": "topMiner",
+              "name": "rewards",
               "docs": [],
               "type": {
-                "kind": "publicKeyTypeNode"
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "topMinerReward",
-              "docs": [],
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u64",
-                "endian": "le"
-              }
-            },
-            {
-              "kind": "structFieldTypeNode",
-              "name": "totalDeployed",
-              "docs": [],
-              "type": {
-                "kind": "numberTypeNode",
-                "format": "u64",
-                "endian": "le"
+                "kind": "arrayTypeNode",
+                "item": {
+                  "kind": "numberTypeNode",
+                  "format": "u64",
+                  "endian": "le"
+                },
+                "count": {
+                  "kind": "fixedCountNode",
+                  "value": 25
+                }
               }
             },
             {
@@ -161,6 +167,24 @@
                 "kind": "numberTypeNode",
                 "format": "u64",
                 "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "totalMiners",
+              "docs": [],
+              "type": {
+                "kind": "numberTypeNode",
+                "format": "u64",
+                "endian": "le"
+              }
+            },
+            {
+              "kind": "structFieldTypeNode",
+              "name": "topMiner",
+              "docs": [],
+              "type": {
+                "kind": "publicKeyTypeNode"
               }
             }
           ]
