@@ -44,9 +44,10 @@ $ ./cargo build --release
 ```env
 RPC_URL=https://your-rpc-endpoint
 KEYPAIR_PATH=/path/to/your/keypair.json
-PER_ROUND_DEPLOY_AMOUNT=0.01
-ORE_REFINED_RATE=1.3
-REMAINING_SLOTS=5
+DEPLOY_BPS=400
+MIN_EV_THRESHOLD_BPS=-500
+REMAINING_SLOTS=15
+NUM_BLOCKS=5
 ```
 
 4. Run the binary
@@ -62,13 +63,14 @@ REMAINING_SLOTS=5
 |---|---|
 | `RPC_URL` | Your Solana RPC endpoint URL |
 | `KEYPAIR_PATH` | Path to your Solana keypair JSON file |
-| `PER_ROUND_DEPLOY_AMOUNT` | SOL amount to deploy per round |
-| `ORE_REFINED_RATE` | Max ORE accepted per 1 unclaimed ORE (see below) |
+| `DEPLOY_BPS` | Fraction of the signer SOL balance to deploy, in basis points (100 = 1%, default: 400) |
+| `MIN_EV_THRESHOLD_BPS` | Minimum acceptable expected value in basis points (see below) |
 | `REMAINING_SLOTS` | Only deploy in the final N slots of each round (see below) |
+| `NUM_BLOCKS` | Number of smallest blocks to target, 1-12 (see below) |
 
 ### 1. remaining_slots
 Deploy only in the final N slots of each round. For example, remaining_slots = 5 limits deployments to the last 5 slots (one slot ≈ 400 ms). Deploying later reduces the chance other deployments change the EV before your transaction lands, but setting this too low may miss rounds.
-### 2. ore_refined_rate
-Expected ORE required to obtain 1 unclaimed ORE. For example, ore_refined_rate = 1.3 means you accept up to 1.3 ORE per unclaimed ORE. A higher value increases deployment frequency (faster conversion) but accepts worse conversion efficiency; a lower value is stricter and results in fewer
-
-The minimum value is 0.9, meaning that it will only be deployed when SOL worth approximately 0.9 ORE can be mined to 1 unclaimed ORE.
+### 2. min_ev_threshold_bps
+Minimum acceptable expected value in basis points. For example, min_ev_threshold_bps = -500 means blocks with an EV worse than -5% are skipped. A lower (more negative) value increases deployment frequency but accepts worse expected value; a higher value is stricter and results in fewer deployments.
+### 3. num_blocks
+Number of smallest blocks the on-chain program targets, from 1 to 12 (default: 5). The program computes Kelly-optimal bets on the `num_blocks` smallest blocks, filters them by the EV threshold, and deploys across the ones that qualify. A smaller value concentrates the deployment on fewer blocks; a larger value spreads it wider.

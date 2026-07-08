@@ -368,8 +368,9 @@ struct Args {
     #[arg(
         long,
         value_name = "NUM_BLOCKS",
-        help = "Number of smallest blocks to target (1-5).",
+        help = "Number of smallest blocks to target (1-12).",
         default_value = "5",
+        value_parser = clap::value_parser!(u8).range(1..=12),
         env = "NUM_BLOCKS"
     )]
     num_blocks: u8,
