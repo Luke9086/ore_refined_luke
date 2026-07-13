@@ -202,8 +202,13 @@ async fn on_chain_main(
             // Always simulate before sending.
             let simulate_result = simulate_transaction(&rpc, &payer, &ixs).await?;
             // Apply 1.5× buffer here; submit_transaction_with_ixs uses the value as-is.
-            let units_consumed =
-                (simulate_result.value.units_consumed.unwrap_or(0) * 15 / 10).max(200_000);
+            // Floor scales with num_blocks: each ORE deploy CPI costs ~19k CU, plus
+            // program logic and the checkpoint/claim instructions (~60k). A flat 200k
+            // floor is too low once num_blocks exceeds ~5.
+            let cu_floor = 60_000 + args.num_blocks as u64 * 25_000;
+            let units_consumed = (simulate_result.value.units_consumed.unwrap_or(0) * 15 / 10)
+                .max(cu_floor)
+                .min(1_400_000);
 
             if simulate_result.value.err.is_some() {
                 info!(
